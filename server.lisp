@@ -2,12 +2,20 @@
 (defpackage #:serve
   (:use #:cl)
   (:export :start
-           :stop))
+           :stop
+           :*server-))
 
 (in-package :serve)
 
+
+
 (defparameter *commands*
   '("left" "right" "down" "rotate" "drop-down") "Contains all of the commands that the client can send.")
+
+(defun server-id (id)
+  (concatenate 'string
+               "server"
+               id))
 
 (defmethod message-with-adressee ((client link:client) message)
   "Makes a string with client-id at the Begining."
@@ -58,7 +66,9 @@
           (t
            ;; Inits player
            (format t "~%Executing command ~w" command)
-           (tetris:with-player (player-functions:init-player id) ;; Changes all of the global variables.
+           (tetris:with-player (player-functions:init-player (player-functions:make-id :as-string id
+                                                                                       :local-p nil))
+             ;; Changes all of the global variables.
              (process-command-sended-to-server client command)
              (inform-other-players client (list command)))))))
 

@@ -9,6 +9,7 @@
            :client
            :client-id
            :client-player
+           :server-running-p
 
            ;; client
            :*client-running*
@@ -55,9 +56,6 @@
   (lock (bt:make-lock))
   (player nil))
 
-;; ------ this 3 arent used in any way.
-;; They might be used if sending data to others would turn out to be expensive.
-;; right now sending data is just via (format stream data)
 
 (defmethod put-data-to-send ((client client) (data string))
   (bt:with-lock-held ((client-lock client))
@@ -73,7 +71,6 @@
             data)
     (force-output (usocket:socket-stream (client-connection client))))
   (format t "~% - [Server]: sended to ~a: ~a - " (client-id client) data))
-;; ------
 
 (defun add-new-client (connection)
   "Adds clients to database and returns created client"
@@ -102,6 +99,8 @@
   "Converts given list to string. Used as id"
   (format nil "~{~a~}" lst))
 
+(defun server-running-p ()
+  *server-running*)
 
 (defun start-simple-server (port callback)
   "Listen on port for messange, and call callback with recived input"

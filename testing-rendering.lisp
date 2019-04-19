@@ -19,13 +19,15 @@
         #:varjo
         #:vari
         #:cepl.skitter.sdl2
-        #:livesupport
         #:utils
         #:tetris-structures
         
 
         )
-  (:export :init-player))
+  (:export :init-player
+           :with-player
+           :inject-controls
+           :prepere-for-multiplayer))
 
 (in-package :testing-rendering)
 
@@ -44,6 +46,8 @@
 (defparameter *local-player* nil "Gets input from this player")
 (defparameter *render-state* nil "Instance of rendering-state. All functions are drawing from this thing.")
 (defparameter *curr-player* nil "")
+(defparameter *playing-multiplayer* nil)
+(defparameter *controls* nil "")
 (setf *render-state* (make-instance 'render-state))
 (setf player-functions:*callback-for-hooking-up-callbacks*
       'register-callbacks)
@@ -158,23 +162,33 @@
   "Handles user input"
   ;; LEFT
   (when (keyboard-button (keyboard) key.a)
-    (tetris:left)
+    (if *playing-multiplayer*
+        (injected-controls :left)
+        (tetris:left))
     (stepper-reset))
   ;; DOWN
   (when (keyboard-button (keyboard) key.s)
-    (tetris:down)
+    (if *playing-multiplayer*
+        (injected-controls :down)
+        (tetris:down))
     (stepper-reset))
   ;; RIGHT
   (when (keyboard-button (keyboard) key.d)
-    (tetris:right)
+    (if *playing-multiplayer*
+        (injected-controls :right)
+        (tetris:right))
     (stepper-reset)))
 
 (defun rotate ()
   (format t "~%Rotating")
-  (tetris:rotate))
+  (if *playing-multiplayer*
+      (injected-controls :rotate)
+      (tetris:rotate)))
 
 (defun drop-down ()
-  (tetris:drop-down))
+  (if *playing-multiplayer*
+      (injected-controls :drop-down)
+      (tetris:drop-down)))
 
 (defun toggle-on-off ()
   (sounds:toggle-on-off))
@@ -196,77 +210,79 @@
 
   (dolist (player player-functions:*players*)
     (progn
-      (player-functions:init-player player)
-      (draw-wall tetris:+width+  tetris:+height+
-                 (animation-color *render-state*)
-                 (animation-timer *render-state*))
-      ;;(print (tetris:get-next-pieces :limit 1))
-      ;; draw current shape
       
-      (loop for row below (length (tetris:get-current-shape))
-         do (loop for column below (length (car (tetris:get-current-shape)))
-               for s = (tetris:symbol-at column
-                                         row
-                                         (tetris:get-current-colored-shape))
-               when (not (eql s '-))
-               do (draw-box (+ (curr-column tetris:*game-state*) column)
-                            (+ (curr-row tetris:*game-state*) row)
-                            0
-                            (get-color-v-for-block s))))
+      (with-player (player-functions:init-player player)
+        (draw-wall tetris:+width+  tetris:+height+
+                   (animation-color *render-state*)
+                   (animation-timer *render-state*))
+        ;;(print (tetris:get-next-pieces :limit 1))
+        ;; draw current shape
+        
+        (loop for row below (length (tetris:get-current-shape))
+           do (loop for column below (length (car (tetris:get-current-shape)))
+                 for s = (tetris:symbol-at column
+                                           row
+                                           (tetris:get-current-colored-shape))
+                 when (not (eql s '-))
+                 do (draw-box (+ (curr-column tetris:*game-state*) column)
+                              (+ (curr-row tetris:*game-state*) row)
+                              0
+                              (get-color-v-for-block s))))
 
-      ;; draw 2 next shapes
-      (let ((offset 1))
-        (loop
-           for num below 2
-           for shape in (mapcar
-                         (lambda (piece)
-                           (tetris:get-colored-shape piece))
-                         (tetris:get-next-pieces :limit 2))
-           ;; TODO maybe it might now work?
-           do (progn (loop for row below (length shape)
-                        do (loop for column below (length (car shape))
-                              for s = (tetris:symbol-at column
-                                                        row
-                                                        shape)
-                              when (not (eql s '-))
-                              do (draw-box (+ tetris:+width+ column 1)
-                                           (+ row 1 offset )
-                                           0
-                                           (get-color-v-for-block s))))
-                     (setf offset (+ 1 offset (length shape))))))
+        ;; draw 2 next shapes
+        (let ((offset 1))
+          (loop
+             for num below 2
+             for shape in (mapcar
+                           (lambda (piece)
+                             (tetris:get-colored-shape piece))
+                           (tetris:get-next-pieces :limit 2))
+             ;; TODO maybe it might now work?
+             do (progn (loop for row below (length shape)
+                          do (loop for column below (length (car shape))
+                                for s = (tetris:symbol-at column
+                                                          row
+                                                          shape)
+                                when (not (eql s '-))
+                                do (draw-box (+ tetris:+width+ column 1)
+                                             (+ row 1 offset )
+                                             0
+                                             (get-color-v-for-block s))))
+                       (setf offset (+ 1 offset (length shape))))))
 
-      ;; draw ghost shape
-      (when (curr-piece tetris:*game-state*)
-        (let* ((ghost-piece (tetris:get-current-ghost-piece))
-               (ghost-shape (piece-shape ghost-piece))
-               (ghost-col (piece-column ghost-piece))
-               (ghost-row (piece-row ghost-piece)))
-          ;;::TODO will it break?
-          (loop for row below (length (tetris:get-current-shape))
-             do (loop for column below (length (car (tetris:get-current-shape)))
-                   for s = (tetris:symbol-at column
-                                             row
-                                             ghost-shape)
-                   when (not (eql s '-))
-                   do (draw-box (+ ghost-col column)
-                                (+ ghost-row row)
-                                0
-                                (v:* (get-color-v-for-block (tetris:get-current-color))
-                                     0.1))))))
-      ;; draw map
-      (loop for row below tetris:+height+
-         do (loop for column below tetris:+width+
-               for s = (tetris:symbol-at column
-                                         row
-                                         (game-map tetris:*game-state*))
-               ;; #TODO just create get-current-map etc.
-               if (eq s '-)
-               do      '(draw-box column row -1 (get-color-v-for-block s))
-               else do (progn
-                         '(draw-box column row -2 (get-color-v-for-block '-))
-                         (draw-box column row 0 (get-color-v-for-block s)))))))
-  
-  (player-functions:init-player *local-player*)
+        ;; draw ghost shape
+        (when (curr-piece tetris:*game-state*)
+          (let* ((ghost-piece (tetris:get-current-ghost-piece))
+                 (ghost-shape (piece-shape ghost-piece))
+                 (ghost-col (piece-column ghost-piece))
+                 (ghost-row (piece-row ghost-piece)))
+            ;;::TODO will it break?
+            (loop for row below (length (tetris:get-current-shape))
+               do (loop for column below (length (car (tetris:get-current-shape)))
+                     for s = (tetris:symbol-at column
+                                               row
+                                               ghost-shape)
+                     when (not (eql s '-))
+                     do (draw-box (+ ghost-col column)
+                                  (+ ghost-row row)
+                                  0
+                                  (v:* (get-color-v-for-block (tetris:get-current-color))
+                                       0.1))))))
+        ;; draw map
+        (loop for row below tetris:+height+
+           do (loop for column below tetris:+width+
+                 for s = (tetris:symbol-at column
+                                           row
+                                           (game-map tetris:*game-state*))
+                 ;; #TODO just create get-current-map etc.
+                 if (eq s '-)
+                 do      '(draw-box column row -1 (get-color-v-for-block s))
+                 else do (progn
+                           '(draw-box column row -2 (get-color-v-for-block '-))
+                           (draw-box column row 0 (get-color-v-for-block s))))))))
+
+  (when (not *playing-multiplayer*)
+      (player-functions:init-player *local-player*)) ;; used ony i
   (swap))
 
 
@@ -318,11 +334,11 @@
 
 (defun init ()
 
-  (add-and-init-local-player)
+  #+nil (add-and-init-local-player)
   
 
-  (sounds:init-sound-system)
-  (sounds:play-background-music)
+  #+nil (sounds:init-sound-system)
+  #+nil (sounds:play-background-music)
 
   ;; init input
 
@@ -336,9 +352,13 @@
       (setf *buf-stream*
             (make-buffer-stream vert :index-array index)))))
 
+#|
+#+ nil (progn
+         (def-simple-main-loop play (:on-start #'init)
+           (draw))
 
-(def-simple-main-loop play (:on-start #'init)
-  (draw))
+         )
+|#
 
 (defun register-callbacks (player)
   (setf (piece-touched (callbacks (player-game-state player))) #'set-background-animation-timer))
@@ -351,25 +371,36 @@
 
 
 ;;;;; meta
+(defun inject-controls (controls)
+  (setf *controls* controls))
 
+(defun injected-controls (control)
+  (handler-case (funcall (second (assoc control *controls*)))
+    (undefined-function (c)
+      (declare (ignore c))
+      (error "You haven't injected controls."))))
+
+(defun prepere-for-multiplayer ()
+  (setf *playing-multiplayer* t))
 
 (defmethod player-functions:init-player ((player player))
   ;; there is :before.
   (setf *render-state* (player-render-state player)
-        *curr-player* (player-number player))
+        *curr-player* player)
   player)
 
-(defun add-and-init-local-player ()
+(defun add-and-init-local-player () ;;unused
   (setf *local-player*
         (player-functions:init-player "local")))
 
 
 (defmacro with-player (player &body body)
   "Replaces all the variables so the game is tricked into thinking that this player is the only player"
-  `(let (;(player-functions:*curr-player* ,player)
+  `(let ((*curr-player* ,player)
          (*render-state* (player-render-state ,player)))
      (tetris:with-player ,player
        ,@body)))
 
 
 (defun cycle-players ())
+

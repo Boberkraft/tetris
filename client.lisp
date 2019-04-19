@@ -5,12 +5,14 @@
 ;; or this colored graphical tetris (testing-rendering.lisp)
 
 (defpackage #:client
-  (:use #:cl
-        
-        )
+  (:use #:cl)
   (:export :start
-           :stop)
-  )
+           :stop
+           :aleft
+           :aright
+           :adown
+           :arotate
+           :adrop-down))
 
 
 (in-package :client)
@@ -29,6 +31,31 @@
 (defun send (message)
   (link:send-data-to-server message))
 
+(defun inject-controls ()
+  (testing-rendering:prepere-for-multiplayer)
+  (testing-rendering:inject-controls (list (list :left 'aleft)
+                                           (list :right 'aright)
+                                           (list :down 'adown)
+                                           (list :drop-down 'adrop-down)
+                                           (list :rotate 'arotate))))
+
+(defun aleft ()
+  (send "left~%"))
+
+(defun aright ()
+  (send "right~%"))
+
+(defun adown ()
+  (send "down~%"))
+
+(defun adrop-down ()
+  (send "drop-down~%"))
+
+(defun arotate ()
+  (send "rotate~%"))
+
+(defun ainitialize ()
+  (send "initialize~%"))
 
 (defun start-message ()
   (send "left~%")
@@ -44,14 +71,13 @@
     (let ((from-who (read message)) ; first
           (command (read message)))    ; second
       (format t "~%  - [Client]: ~s from ~a " command from-who)
-      (accept-command from-who command))))
+      (testing-rendering:with-player (player-functions:init-player from-who) ;; NOTE, with player?
+        (process-command command)))))
 
-(defmethod accept-command ((player-id string) (command list))
-  (tetris:with-player (player-functions:init-player player-id)
-    (accept-command (player-functions:init-player player-id) command)))
 
-(defmethod accept-command ((player tetris-structures:player) (command list))
-  (let ((game-state (tetris-structures:player-game-state player)))
+(defmethod process-command ((command list))
+  "Every global variable is replaced.  "
+  (let ((game-state tetris:*game-state*))
     (alexandria:switch ((first command) :test #'equalp)
       ("left" (tetris:left))
       ("right" (tetris:right))
@@ -66,6 +92,7 @@
                  ("curr-column" (setf (tetris-structures:curr-column game-state) value))
                  ("curr-piece"  (setf (tetris-structures:curr-piece game-state)
                                       (let* ((name (fourth command))
+                                             ;; rotating by 4 is like rotating by 0
                                              (num-of-rotations (mod (third command) 4))
                                              (piece (tetris:get-piece name)))
                                         ;; rotate it a cuple of times...
@@ -82,5 +109,6 @@
 
 #+nil (start-dummy-client)
 #+nil (link:create-read-loop 'read-loop)
+#+nil (inject-controls)
 #+nil (start-message)
 #+nil (stop)
