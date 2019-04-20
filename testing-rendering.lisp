@@ -196,10 +196,7 @@
 ;;;;;;;;; --------  DRAWNINI
 (defun draw ()
   (step-host)
-  (let ((now (now)))
-    (setf (animation-timer *render-state*) (+ (animation-timer *render-state*)
-                                              (- now (time-before-draw *render-state*)))
-          (time-before-draw *render-state*) now))
+  
 
   (setf (resolution (current-viewport))
         (surface-resolution (current-surface (cepl-context))))
@@ -210,8 +207,12 @@
 
   (dolist (player player-functions:*players*)
     (progn
-      
       (with-player (player-functions:init-player player)
+        (let ((now (now)))
+          (setf (animation-timer *render-state*) (+ (animation-timer *render-state*)
+                                                    (- now (time-before-draw *render-state*)))
+                (time-before-draw *render-state*) (now)))
+        
         (draw-wall tetris:+width+  tetris:+height+
                    (animation-color *render-state*)
                    (animation-timer *render-state*))
