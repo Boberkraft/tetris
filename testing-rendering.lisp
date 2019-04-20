@@ -362,7 +362,7 @@
 |#
 
 (defun register-callbacks (player)
-  (setf (piece-touched (callbacks (player-game-state player))) #'set-background-animation-timer))
+  (setf (piece-touched (callbacks (player-game-state player))) 'set-background-animation-timer))
 
 
 (defun main ()
