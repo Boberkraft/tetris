@@ -22,8 +22,12 @@ Turn on Common lisp:
 (play :start)
 ```
 
-### Third iteration
+### Multiplayer added
 
+(now you can play versus yourself, or something.)
+![animation](readme-images/image4.gif)
+
+### Third iteration
 
 (added option to have draw multiple games at once.)
 ![animation](readme-images/image3.gif)
