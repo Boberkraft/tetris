@@ -505,8 +505,6 @@
   (setf (game-over *game-state*) t)
   (format t "~%GAME OVER!")
   ;; TODO gamover callback?
-  (setf (game-map *game-state*)
-        (create-map))
   )
 
 
@@ -515,6 +513,10 @@
 
 '(init-tetris)
 
+(defun init-tetris ()
+  (reinit-tetris (make-instance 'game-state))
+  (setf (game-map *game-state*) (create-map))  ;; TODO: it shound be in lisp-structures
+  (populate-next-pieces))
 
 ;;;---------------------  META STUFF
 
@@ -524,9 +526,7 @@
         (was-before *game-state*)) ; if *game-state* is nil. 
 
     ;;set new
-    (reinit-tetris (make-instance 'game-state))
-    (setf (game-map *game-state*) (create-map)) ;; TODO: it shound be in lisp-structures
-    (populate-next-pieces)                      ;; <--- (this)  but i dont know how to do it.
+    (init-tetris)
     ;;reinit back
 
     (prog1
