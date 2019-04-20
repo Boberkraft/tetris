@@ -8,11 +8,14 @@
   (:use #:cl)
   (:export :start
            :stop
-           :aleft
-           :aright
-           :adown
-           :arotate
-           :adrop-down))
+           :left
+           :right
+           :start-dummy-client
+           :down
+           :read-loop
+           :rotate
+           :super-client
+           :drop-down))
 
 
 (in-package :client)
@@ -39,22 +42,22 @@
                                            (list :drop-down 'adrop-down)
                                            (list :rotate 'arotate))))
 
-(defun aleft ()
+(defun left ()
   (send "left~%"))
 
-(defun aright ()
+(defun right ()
   (send "right~%"))
 
-(defun adown ()
+(defun down ()
   (send "down~%"))
 
-(defun adrop-down ()
+(defun drop-down ()
   (send "drop-down~%"))
 
-(defun arotate ()
+(defun rotate ()
   (send "rotate~%"))
 
-(defun ainitialize ()
+(defun initialize ()
   (send "initialize~%"))
 
 (defun start-message ()
@@ -107,8 +110,23 @@
   (loop while link:*client-running*
      do (sleep 0.1)))
 
+(defun super-client ()
+  (start-dummy-client)
+  (link:create-read-loop 'read-loop)
+  (loop (let ((choices '(client:left client:left client:left client:left client:left client:left
+                         client:right client:right client:right client:right client:right client:right
+                         client:rotate
+                         client:rotate
+                         client:down client:down client:down client:down client:down client:down client:down client:down
+                         client:down client:down client:down client:down client:down client:down client:down client:down
+                         client:drop-down)))
+          (sleep 0.3)
+          (funcall (nth (random (1- (length choices)))
+                        choices)))))
 #+nil (start-dummy-client)
 #+nil (link:create-read-loop 'read-loop)
 #+nil (inject-controls)
+#+nil (super-client)
+#+nil '((left) (right) (down) (drop-down) (rotate))
 #+nil (start-message)
 #+nil (stop)
