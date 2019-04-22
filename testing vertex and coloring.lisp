@@ -1,3 +1,11 @@
+(ql:quickload :nineveh)
+(ql:quickload :cepl)
+(ql:quickload :cepl.sdl2)
+(ql:quickload :rtg-math)
+(use-package :nineveh)
+(use-package :cepl)
+(use-package :rtg-math)
+
 (defparameter *vertex-stream* nil)
 (defparameter *array* nil)
 (defparameter *loop* 0.0)
@@ -8,7 +16,7 @@
 ;; symbol is bound to a value, and if it is it checks the type of
 ;; the value for a suitable matching varjo type
 (defun-g vertex-stage ((v-pos :vec4))
-  (let* ((pos ))
+  (let* ((pos 0))
     (values v-pos
             v-pos)))
 
@@ -45,24 +53,21 @@
 
 (defun step-demo ()
   (step-host)
-  (update-repl-link)
   (clear)
   (map-g #'lol *vertex-stream*)
   (swap))
 
-(let ((running nil))
-  (defun run-loop ()
-    (setf running t)
-    (setf *array* (make-gpu-array (list (v! -1  1 0 1)
-                                        (v! -1 -1 0 1)
-                                        (v!  1 -1 0 1)
-                                        (v!   -1    1 0 1)
-                                        (v!   1    -1 0 1)
-                                        (v!   1     1 0 1)
-                                        )))
-    (setf *vertex-stream* (make-buffer-stream *array*))
-    (loop :while (and running (not (shutting-down-p))) :do
-       (continuable (step-demo))))
-  (defun stop-loop () (setf running nil)))
 
-(run-loop)
+(defun run-loop ()
+  (setf *array* (make-gpu-array (list (v! -1  1 0 1)
+                                      (v! -1 -1 0 1)
+                                      (v!  1 -1 0 1)
+                                      (v!   -1    1 0 1)
+                                      (v!   1    -1 0 1)
+                                      (v!   1     1 0 1)
+                                      )))
+  (setf *vertex-stream* (make-buffer-stream *array*)))
+
+
+(def-simple-main-loop play (:on-start #'run-loop)
+  (step-demo))
