@@ -28,12 +28,7 @@
 
 
 
-;;client
-(defparameter *client-running* nil "True if the connection exists.")
-(defparameter *server-stream* nil "Stream that connects to the server.")
-(defparameter *data-to-send* nil "List of data to send.")
-(defparameter *read-loop-lock* (bt:make-lock))
-(defparameter *unreaded-data* nil)
+
 ;;server
 (defparameter *server-running* nil)
 ;; TODO move this to tetris
@@ -89,6 +84,7 @@
           (remove client *clients* :test #'eq))))
 
 (defun send-data-to-all-clients (message)
+  "Sends message to all of the clients."
   (bt:with-lock-held (*change-clients-lock*)
     (dolist (client *clients*)
       (send-data-to-client client message))))
@@ -112,12 +108,15 @@
             (when (and (usocket:wait-for-input socket :timeout 1) ;; SETS SOCKET
                        ;; wait for 1 second, returns nil if timeouted.
                        *server-running*)
-              (bt:make-thread
-               (lambda ()
-                 (usocket:with-connected-socket (connection (usocket:socket-accept socket))
-                   (handle-connection connection callback)))))))))
+              (let ((connection (usocket:socket-accept socket)))
+                (bt:make-thread
+                 (lambda ()
+                   (usocket:with-connected-socket
+                       (handle-connection connection callback)))
+                 :name (format nil "<SERVER: Thread for handling ~a>" connection) )))))))
 
 (defun handle-connection (connection callback)
+  "Handles the communication."
   (let ((client (add-new-client connection)))
     (unwind-protect
          (progn (format t "~% - [Server]: connection ~w accepted - " (client-id client))
@@ -146,36 +145,55 @@
      (unwind-protect
           (progn (loop while *server-running*
                     do (progn
-                         (start-simple-server 5518 function))))
-       (setf *server-running* nil))
-     (format t "~% - [Server] STOPING - "))))
+                         (start-simple-server 5519 function))))
+       (stop-server))
+     (format t "~% - [Server] STOPING - "))
+   :name "<SERVER main thread>"))
 
 (defun stop-server ()
+  "Resets all server variables"
   (setf *server-running* nil))
 
-;;; ----------- client
+;;; ---------------------------------------------- CLIENT
 
+;;client
+(defparameter *client-running* nil "True if the client is running")
+(defparameter *server-stream* nil "Stream that connects to the server. Nil if it doesnt exists.")
+(defparameter *data-to-send* nil "List of data to send.")
+(defparameter *read-loop-lock* (bt:make-lock))
+(defparameter *unreaded-data* nil)
 
 (defun start-client (function)
   (if (not *client-running*)
       (progn
         (bt:make-thread (lambda ()
-                          (start-simple-client 5518 function)))
+                          (simple-client 5519 function)))
         (setf *client-running* t))
       (format t "~% - [Client]: ALREADY RUNNING -")))
 
 (defun stop-client ()
-  (setf *client-running* nil))
+  "Deinitializes all variables."
+  (format t "~% - [Client]: STOPPING -")
+  (setf *client-running* nil)
+  (setf *server-stream* nil))
 
-;;; Imperetive style. Unused.
+(defun connected-p ()
+  "Retruns true if connection between server and client is established."
+  (and *client-running*
+       *server-stream*))
+
+;;; ---------- Imperetive style. Unused and UNSTESTED
 (defun create-read-loop ()
   (bt:make-thread (lambda ()
                     (loop while *client-running*
-                       do (funcall 'read-loop)))))
+                       do (funcall 'read-loop)))
+                  :name "<CLIENT functional read-loop>"))
+
 (defun read-loop ()
-  (let ((data (read link:*server-stream*)))
-    (bt:with-lock-held (*read-loop-lock*)
-      (push data *unreaded-data*))))
+  (when (connected-p)
+    (let ((data (read link:*server-stream*)))
+      (bt:with-lock-held (*read-loop-lock*)
+        (push data *unreaded-data*)))))
 
 (defun is-there-data-to-read ()
   (null *unreaded-data*))
@@ -187,24 +205,29 @@
 ;;; ----------------
 ;; Functional style.
 (defun create-read-loop (callback)
+  "Creates a standalone thread that calls callback while the client is running."
   (bt:make-thread (lambda ()
                     (loop while *client-running*
-                         do (on-message-loop callback)))))
+                       do (when *server-stream* ; call only if the connection is established.
+                            (on-message-loop callback))))
+                  :name "<CLIENT functional read-loop>"))
+
 
 (defun on-message-loop (callback)
+  "Calls callback on every new message recived from server."
   ;; blocking
   (let ((data (read-line link:*server-stream*)))
-    (sleep 1)
     (format t "~% - [Client]: recived: ~a" data)
     (funcall callback data)))
 
 (defun send-data-to-server (message)
-  (format *server-stream* message)
-  (force-output *server-stream*))
+  (handler-case
+      (progn (format *server-stream* message)
+             (force-output *server-stream*))
+    ))
 
-(defun start-simple-client (port callback)
+(defun simple-client (port callback)
   "Connect to a server and send a messange."
-  (setf *client-running* t)
   (format t "~% - [Client]: STARTING - ")
   ;; FIXME: do it without with this with-xxx stuff and just close the connection at stop.
   ;; so this sleep can be removed. Then sending data is simpyfied and you can just pass socket stream.
@@ -215,6 +238,13 @@
          (loop while *client-running*
             do (funcall callback)))
     ;; something broke (prob. socket in use or something)
-    (progn (format t "~% - [Client]: STOPPING -")
-           (setf *client-running* nil)
-           (setf *server-stream* nil))))
+    (progn (stop-client))))
+
+
+(handler-bind ((error (lambda (c)
+                        (declare (sb-ext:disable-package-locks 'accept))
+                        (print c)
+                        (sb-ext:unlock-package :sb-impl)
+                        (invoke-restart 'sb-impl::accept))))
+
+  (ql:quickload :nineveh))
