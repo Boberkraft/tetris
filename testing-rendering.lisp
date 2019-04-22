@@ -342,7 +342,7 @@
   #+nil (sounds:play-background-music)
 
   ;; init input
-
+  (delete-event-listeners)
   (on-key-down key.space 'drop-down)
   (on-key-down key.r 'rotate)
   (on-key-down key.m 'toggle-on-off)

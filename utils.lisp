@@ -6,6 +6,7 @@
            :stepper-reset
            :now
            :get-color-v-for-block
+           :delete-event-listeners
            :on-key-down
            :on-key-up
            :on-key))
@@ -58,16 +59,14 @@
 
 
 
-(defparameter *active-listeners* nil "Alist containing  pairs KEY . (callback EVENT-LISTINER)")
+(defparameter *active-listeners* nil "Alist containing records (KEY callback EVENT-LISTINER)")
 
 (defun add-event-listener-to-system (key callback special-callback)
   "adds event to system, replacing old both use the same calback function"
 
-  (let* ((value (assoc key *active-listeners*))
-         (old-callback (cadr value))
-         (old-event-listener (caddr value))
-         )
-
+  (let* ((record (assoc key *active-listeners*))
+         (old-callback (cadr record))
+         (old-event-listener (caddr record)))
     (when  (equalp old-callback ;; check if functions are queal
                    callback)   ;; if yes, then this callback is already added.
       (skitter:stop-listening old-event-listener)
@@ -84,6 +83,11 @@
       (push (cons key (list callback listener))
             *active-listeners*))))
 
+(defun delete-event-listeners ()
+  "Unlistens all listeners and removes them."
+  (loop for (key callback listener) in *active-listeners*
+     do (skitter:stop-listening listener))
+  (setf *active-listeners* nil))
 
 (defun on-key-up (key callback &optional more-data-p)
   "Calls callback when key is unpressed.
