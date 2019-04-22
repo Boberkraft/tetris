@@ -1,12 +1,13 @@
 (defpackage #:sounds
   (:use :cl)
   (:export :init-sound-system
-           :play-background-music
+           :play-song ;; FIXME
+           :play-next-song
            :stop
            :play-hit-sound
            :resume
            :pausedp
-           :toggle-on-off
+           :music-on-off
            :change-volume))
 (in-package :sounds)
 
@@ -33,7 +34,8 @@
 
 (defmethod music-queue-stop-playing ((queue music-queue))
   (when (music-queue-playingp queue)
-    (harmony:pause (music-queue-source queue)))
+    (when harmony-simple:*server*
+      (harmony:pause (music-queue-source queue))))
   (setf (music-queue-playingp queue) nil))
 
 (defmethod music-queue-play-current-song ((queue music-queue))
@@ -49,8 +51,9 @@
 
 (defmethod music-queue-play-nth-song ((queue music-queue) (num number))
   "Plays the nth song from album. If it doesnt exists, do nothing."
-  (when (< num
-           (length (music-queue-album queue))) ; in limit
+  (when (and (< num
+                (length (music-queue-album queue))) ; in limit?
+             harmony-simple:*server*) ; is initialized?
     (when (music-queue-playingp queue)
       (print (music-queue-source queue))
       (print "pausing")
@@ -65,19 +68,34 @@
       (setf (music-queue-playingp queue) t))
     (music-queue-reload-volume queue))) ; set volume to good value.
 
+(defmethod music-queue-play-sound ((queue music-queue))
+  (let* ((record (nth (music-queue-current-number queue)
+                      (music-queue-album queue)))
+         (type (first record))
+         (name (second record)))
+    (setf (music-queue-source queue) (harmony-simple:play name type))))
+
 ;;;; -------------------------------------------------------------------
 (defparameter *server* nil "Harmony server.")
-(defparameter *bg-queue* nil "Instance of music-queue. Contains all of the background songs.")
-(defparameter *hit-queue* nil "Instance of music-queue. Contains sounds for block hitting.")
+(defparameter *bg-queue* (make-music-queue :current-number 0
+                                           :album nil)
+  "Instance of music-queue. Contains all of the background songs.")
+
+(defparameter *hit-queue* (make-music-queue :current-number 0
+                                            :album nil)
+  "Instance of music-queue. Contains sounds for block hitting.")
 ;;TODO: MAKE IT IN BUFFERS
 
 
 (defun pausedp ()
-  *stopped*)
+  "Retrns true if background music is playing."
+  (not (music-queue-playingp *bg-queue*)))
+
 
 (defun init-sound-system ()
   (setf *bg-queue* (make-music-queue :current-number 0
-                                     :album '((:sfx #p"music/banks.mp3")
+                                     :album '((:sfx #p"music/Alex - Analog Electronic Synth Sound 01.mp3")
+                                              (:sfx #p"music/banks.mp3")
                                               (:sfx #p"music/chibi-tech Smugface Mafia.mp3")
                                               (:sfx #p"music/Chipzel Focus.mp3")
                                               (:sfx #p"music/Chipzel To The Sky.mp3"))))
@@ -86,9 +104,10 @@
   (setf *server* (harmony-simple:initialize :output-spec '(harmony-out123:out123-drain))))
 
 
-(defun play-background-music ()
+(defun play-song (number)
   "Starts background song"
-  (music-queue-play-current-song *bg-queue*))
+  (print number)
+  (music-queue-play-nth-song *bg-queue* number))
 
 (defun play-next-song ()
   (music-queue-play-next-song *bg-queue*))
@@ -103,13 +122,13 @@
 (defun change-volume (val)
   (music-queue-change-volume *bg-queue* val))
 
-(defun toggle-on-off ()
+(defun music-on-off ()
   "Toggles between ON and OFF.
-   Resumes when stopped, stopps when playinh"
+   Resumes when stopped, stopps when playing"
   (if (music-queue-playingp *bg-queue*)
       (resume)
       (stop)))
 
 (defun play-hit-sound ()
   "The sound of block hitting"
-  (music-queue-play-current-song *hit-queue*))
+  (music-queue-play-sound *hit-queue*))
