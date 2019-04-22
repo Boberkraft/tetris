@@ -279,6 +279,7 @@
 
 
 (defun add-shape-to-map (shape start-col start-row)
+
   (loop for row below (length shape)
      do (loop for column below (length (car shape))
            for shape-symbol = (symbol-at column
@@ -450,7 +451,7 @@
                                      (curr-column *game-state*)
                                      (curr-row *game-state*))
         (game-over-screen)
-        (init-tetris)
+        (restart-tetris)
         (return-from game-tick)))
     (move-shape d-x d-y)))
 
@@ -502,7 +503,7 @@
   (remove-current-piece-from-map))
 
 (defun game-over-screen ()
-  (setf (game-over *game-state*) t)
+  #+nil (setf (game-over *game-state*) t)
   (format t "~%GAME OVER!")
   ;; TODO gamover callback?
   )
@@ -511,19 +512,21 @@
 
 '(simple-repl)
 
-'(init-tetris)
 
 (defun init-tetris ()
+  (print "init")
   (reinit-tetris (make-instance 'game-state))
+  (restart-tetris))
+
+(defun restart-tetris ()
   (setf (game-map *game-state*) (create-map))  ;; TODO: it shound be in lisp-structures
   (populate-next-pieces))
-
 ;;;---------------------  META STUFF
 
 (defun create-game-state ()
   "Creates new game-state and returns it."
   (let ((game-state *game-state*)
-        (was-before *game-state*)) ; if *game-state* is nil. 
+        (was-before *game-state*)) ; if *game-state* is nil.
 
     ;;set new
     (init-tetris)

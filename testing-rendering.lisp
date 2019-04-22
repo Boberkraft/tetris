@@ -27,6 +27,7 @@
   (:export :init-player
            :with-player
            :inject-controls
+           :play
            :prepere-for-multiplayer))
 
 (in-package :testing-rendering)
@@ -161,19 +162,22 @@
 (defun advanced-repl ()
   "Handles user input"
   ;; LEFT
-  (when (keyboard-button (keyboard) key.a)
+  (when (or (keyboard-button (keyboard) key.a)
+            (keyboard-button (keyboard) key.left))
     (if *playing-multiplayer*
         (injected-controls :left)
         (tetris:left))
     (stepper-reset))
   ;; DOWN
-  (when (keyboard-button (keyboard) key.s)
+  (when (or (keyboard-button (keyboard) key.s)
+            (keyboard-button (keyboard) key.down))
     (if *playing-multiplayer*
         (injected-controls :down)
         (tetris:down))
     (stepper-reset))
   ;; RIGHT
-  (when (keyboard-button (keyboard) key.d)
+  (when (or (keyboard-button (keyboard) key.d)
+            (keyboard-button (keyboard) key.right))
     (if *playing-multiplayer*
         (injected-controls :right)
         (tetris:right))
@@ -190,8 +194,16 @@
       (injected-controls :drop-down)
       (tetris:drop-down)))
 
-(defun toggle-on-off ()
-  (sounds:toggle-on-off))
+(defun music-on-off ()
+  (sounds:music-on-off))
+
+(defun play-background-music (&optional (what-song nil))
+  "Plays next song, or one from the album."
+  
+  (format t "Song nr. ~a" what-song)
+  (if what-song
+      (sounds:play-song (1- what-song))
+      (sounds:play-next-song)))
 
 ;;;;;;;;; --------  DRAWNINI
 (defun draw ()
@@ -283,12 +295,13 @@
                            (draw-box column row 0 (get-color-v-for-block s))))))))
 
   (when (not *playing-multiplayer*)
-      (player-functions:init-player *local-player*)) ;; used ony i
-  (swap))
+      (player-functions:init-player *local-player*)) ;; used only in local
+  (swap)
+  )
 
 
 (defun draw-wall (width height color time)
-
+  
   (map-g #'wall-pipeline (get-quad-stream-v2)
          :now (now)
          :width (+ width 2)
@@ -335,8 +348,8 @@
 
 (defun init ()
 
-  #+nil (add-and-init-local-player)
-  
+  (when (not *playing-multiplayer*)
+    (add-and-init-local-player))
 
   #+nil (sounds:init-sound-system)
   #+nil (sounds:play-background-music)
@@ -344,8 +357,29 @@
   ;; init input
   (delete-event-listeners)
   (on-key-down key.space 'drop-down)
+  (on-key-down key.return 'drop-down)
   (on-key-down key.r 'rotate)
-  (on-key-down key.m 'toggle-on-off)
+  (on-key-down key.up 'rotate)
+  (on-key-down key.m 'music-on-off)
+  (on-key-down key.m 'sounds:play-hit-sound)
+  ;;creates 'named lamdas' for music keys.
+  ;;https://stackoverflow.com/questions/22975732/lisp-dynamically-define-functions
+  (loop for (key num) in (list (list key.1 1)
+                               (list key.2 2)
+                               (list key.3 3)
+                               (list key.4 4)
+                               (list key.5 5)
+                               (list key.6 6))
+     do (let ((key-f-name (make-symbol (format nil "play-music-on-key-~a" num)))
+              (number num))
+          ;; create this function.
+          (setf (fdefinition key-f-name)
+                (lambda ()
+                  (format t "num:~a" number)
+                  (play-background-music number)))
+          ;; link it.
+          (on-key-down key key-f-name)))
+
   ;; cepl stuff. Binds buffer stream containing vertexes for 3d cube.
   (unless *buf-stream*
     (destructuring-bind (vert index)
@@ -353,21 +387,22 @@
       (setf *buf-stream*
             (make-buffer-stream vert :index-array index)))))
 
-#|
+
 #+ nil (progn
          (def-simple-main-loop play (:on-start #'init)
-           (draw))
+           (draw)))
 
-         )
-|#
 
 (defun register-callbacks (player)
   (setf (piece-touched (callbacks (player-game-state player))) 'set-background-animation-timer))
 
-
+(defun main-start ()
+  (cepl:repl)
+  (bt:make-thread (lambda ()
+                    (loop (draw)))))
 (defun main ()
-  (tetris:create-computer)
-  (loop while (not (game-over tetris:*game-state*))
+  #+nil (tetris:create-computer)
+  (loop while (not (tetris-structures:game-over tetris:*game-state*))
      do (draw)))
 
 
@@ -386,6 +421,7 @@
 
 (defmethod player-functions:init-player ((player player))
   ;; there is :before.
+
   (setf *render-state* (player-render-state player)
         *curr-player* player)
   player)
@@ -403,5 +439,12 @@
        ,@body)))
 
 
-(defun cycle-players ())
 
+
+#+ nil (handler-bind ((sb-kernel:simple-package-error (lambda (c)
+                                                        (declare (ignore c))
+                                                        (invoke-restart 'sb-ext:accept))))
+
+         (ql:quickload :nineveh))
+
+(defun cycle-players ())
