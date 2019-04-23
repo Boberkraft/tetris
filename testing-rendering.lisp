@@ -39,15 +39,67 @@
 ;;cepl stuff
 (defvar *buf-stream* nil)
 (defvar *gpu-arr* nil)
-(defparameter *fbo* nil)
-(defparameter *fbo-tex* nil)
-(defparameter *fbo-sampler* nil)
-(defparameter *bfbo* nil)
-(defparameter *bfbo-tex* nil)
-(defparameter *bfbo-sampler* nil)
-(defparameter *rest-fbo* nil)
-(defparameter *rest-fbo-tex* nil)
-(defparameter *rest-fbo-sampler* nil)
+(defparameter *frames* nil)
+(defclass frame ()
+  ((fbo
+    :accessor frame-fbo)
+   (tex
+    :accessor frame-tex)
+   (sampler
+    :accessor frame-sampler)
+   (in-use
+    :documentation ""
+    :initform nil
+    :accessor frame-in-use-p)))
+
+(defmethod initialize-instance :after ((c frame) &rest args)
+  (declare (ignore args))
+  (setf (frame-fbo c) (make-fbo 0 :d))
+  (setf (frame-tex c) (gpu-array-texture (attachment (frame-fbo c) 0)))
+  (setf (frame-sampler c) (sample (frame-tex c))))
+
+(defmethod use-frame ((c frame))
+  (setf (frame-in-use-p c) t))
+
+(defmethod free-frame ((c frame))
+  (setf (frame-in-use-p c) nil))
+
+(defmethod frame-is-free-p ((c frame))
+  (not (frame-in-use-p c)))
+
+(defun make-some-frames (how-many)
+  (setf *frames*
+        (loop for x below how-many
+           collect (make-instance 'frame))))
+
+(defun get-free-frame ()
+  (let ((fr (find-if 'frame-is-free-p *frames*)))
+    (if fr
+        (progn (use-frame fr)
+               fr)
+        (error "No free frame found!"))))
+
+(defmacro with-frame (name &body body)
+  `(let ((,name (get-free-frame)))
+     ,@body
+     (free-frame ,name)))
+
+(defmacro with-frames (names &body body)
+  (let ((lamba-list (loop for name in names
+                       collect (list name (list 'get-free-frame)))) 
+        (free-list (loop for name in names
+                      collect (list 'free-frame name))))
+    `(let (,@lamba-list)
+       ,@body
+       ,@free-list)))
+
+(defmacro with-player (player &body body)
+  "Replaces all the variables so the game is tricked into thinking that this player is the only player"
+  `(let ((*curr-player* ,player)
+         (*render-state* (player-render-state ,player)))
+     (tetris:with-player ,player
+       ,@body)))
+
 
 (defparameter *local-player* nil "Gets input from this player")
 (defparameter *render-state* nil "Instance of rendering-state. All functions are drawing from this thing.")
@@ -157,7 +209,7 @@
          (bg-color (texture bg-sampler cords)))
     (if (= 0 (v:s~ block-color :w))
         bg-color
-        (v! (* (v:s~ block-color :xyz)
+        (v! (* (v! 0.8 0.8 0.8)
                (- 0.7
                   (v:s~ (* bg-color
                            2) :y)))
@@ -263,8 +315,14 @@
 (defun draw ()
   (step-host)
 
-  (setf (resolution (current-viewport))
-        (surface-resolution (current-surface (cepl-context))))
+
+  (let ((changed (not (equalp (resolution (current-viewport))
+                              (surface-resolution (current-surface (cepl-context)))))))
+    (setf (resolution (current-viewport))
+          (surface-resolution (current-surface (cepl-context))))
+    (when changed
+      '(print (format nil "changed~a" (random 1230)))
+      (make-frames)))
   (clear)
 
   (when (stepper-can-p)
@@ -273,18 +331,23 @@
   (dolist (player player-functions:*players*)
     (progn
       (with-player (player-functions:init-player player)
+        
         (let ((now (now)))
           (setf (animation-timer *render-state*) (+ (animation-timer *render-state*)
                                                     (- now (time-before-draw *render-state*)))
                 (time-before-draw *render-state*) (now)))
-        
-          (with-fbo-bound (*fbo*)
+        (with-frames (background-fbo
+                      shadow-fbo
+                      background-and-shadow-fbo
+                      pieces-and-next-pieces-fbo
+                      current-piece-fbo)
+          (with-fbo-bound ((frame-fbo background-fbo))
             (clear)
             (draw-wall tetris:+width+  tetris:+height+
                        (animation-color *render-state*)
                        (animation-timer *render-state*)))
           (when (curr-piece tetris:*game-state*)
-            (with-fbo-bound (*bfbo*)
+            (with-fbo-bound ((frame-fbo shadow-fbo))
               (clear)
               (let* ((ghost-piece (tetris:get-current-ghost-piece))
                      (ghost-shape (piece-shape ghost-piece))
@@ -301,15 +364,15 @@
                                       (+ ghost-row row)
                                       0
                                       (get-color-v-for-block (tetris:get-current-color))))))))
-          (with-fbo-bound (*rest-fbo*)
+          (with-fbo-bound ((frame-fbo background-and-shadow-fbo))
             (clear)
             (map-g #'ghost-block-pipeline (get-quad-stream-v2)
-                   :bg-sampler *fbo-sampler*
-                   :block-sampler *bfbo-sampler*))
+                   :bg-sampler (frame-sampler background-fbo)
+                   :block-sampler (frame-sampler shadow-fbo)))
           ;;(print (tetris:get-next-pieces :limit 1))
           ;; draw current shape
 
-          (with-fbo-bound (*bfbo*)
+          (with-fbo-bound ((frame-fbo current-piece-fbo))
             (clear)
             (loop for row below (length (tetris:get-current-shape))
                do (loop for column below (length (car (tetris:get-current-shape)))
@@ -323,7 +386,7 @@
                                   (get-color-v-for-block s)))))
 
           ;; draw 2 next shapes
-          (with-fbo-bound (*fbo*)
+          (with-fbo-bound ((frame-fbo pieces-and-next-pieces-fbo))
             (clear)
             ;; draw next shapes
             (let ((offset 1))
@@ -357,18 +420,20 @@
                      else do (progn
                                '(draw-box column row -2 (get-color-v-for-block '-))
                                (draw-box column row 0 (get-color-v-for-block s))))))
-          (with-blending (make-blending-params)
+          (with-blending (make-blending-params
+                          :destination-rgb :dst-alpha
+                          :destination-alpha :dst-alpha
+                          )
             (map-g #'combine-3-fbo (get-quad-stream-v2)
-                   :1st *bfbo-sampler*
-                   :2nd *fbo-sampler*
-                   :3th *rest-fbo-sampler*))
-          )))
+                   :1st (frame-sampler current-piece-fbo)
+                   :2nd (frame-sampler pieces-and-next-pieces-fbo)
+                   :3th (frame-sampler background-and-shadow-fbo)))))
+    ))
 
 
   (when (not *playing-multiplayer*)
     (player-functions:init-player *local-player*)) ;; used only in local
-  (swap)
-  )
+  (swap))
 
 
 (defun draw-wall (width height color time)
@@ -456,17 +521,11 @@
         (nineveh.mesh.data.primitives:box-gpu-arrays)
       (setf *buf-stream*
             (make-buffer-stream vert :index-array index))))
-  (setf *fbo* (make-fbo 0 :d))
-  (setf *fbo-tex* (gpu-array-texture (attachment *fbo* 0 )))
-  (setf *fbo-sampler* (sample *fbo-tex*))
-  (setf *bfbo* (make-fbo 0 :d))
-  (setf *bfbo-tex* (gpu-array-texture (attachment *bfbo* 0)))
-  (setf *bfbo-sampler* (sample *bfbo-tex*))
-  (setf *rest-fbo* (make-fbo 0 :d))
-  (setf *rest-fbo-tex* (gpu-array-texture (attachment *rest-fbo* 0)))
-  (setf *rest-fbo-sampler* (sample *rest-fbo-tex*))
+  (make-frames)
   )
 
+(defun make-frames ()
+    (make-some-frames 5))
 
 #+ nil (progn
          (def-simple-main-loop play (:on-start #'init)
@@ -511,12 +570,7 @@
         (player-functions:init-player "local")))
 
 
-(defmacro with-player (player &body body)
-  "Replaces all the variables so the game is tricked into thinking that this player is the only player"
-  `(let ((*curr-player* ,player)
-         (*render-state* (player-render-state ,player)))
-     (tetris:with-player ,player
-       ,@body)))
+
 
 
 
