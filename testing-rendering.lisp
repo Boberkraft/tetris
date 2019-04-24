@@ -31,7 +31,10 @@
 
 #+nil (progn
         (declaim (optimize (debug 3)))
-        (swank:set-default-directory "c:\\Users\\Bobi\\Desktop\\lispu\\projekty\\testing-rendering\\")
+        (swank:set-default-directory "c:\\Users\\Bobi\47)
+
+\Desktop\\lispu\\projekty
+\\testing-rendering\\")
         (push #p"C:/Users/Bobi/Desktop/lispu/projekty/testing-rendering/" asdf:*central-registry*)
         (ql:quickload :testing-rendering)
         (in-package #:testing-rendering))
@@ -54,7 +57,8 @@
 
 (defmethod initialize-instance :after ((c frame) &rest args)
   (declare (ignore args))
-  (setf (frame-fbo c) (make-fbo 0 :d))
+  (format t "~% Making new fbo.")
+  (setf (frame-fbo c) (make-fbo 0 ))
   (setf (frame-tex c) (gpu-array-texture (attachment (frame-fbo c) 0)))
   (setf (frame-sampler c) (sample (frame-tex c))))
 
@@ -68,6 +72,8 @@
   (not (frame-in-use-p c)))
 
 (defun make-some-frames (how-many)
+  (loop for frame in *frames*
+     do (free (frame-fbo frame)))
   (setf *frames*
         (loop for x below how-many
            collect (make-instance 'frame))))
@@ -76,6 +82,7 @@
   (let ((fr (find-if 'frame-is-free-p *frames*)))
     (if fr
         (progn (use-frame fr)
+               (clear (frame-fbo fr))
                fr)
         (error "No free frame found!"))))
 
@@ -86,7 +93,7 @@
 
 (defmacro with-frames (names &body body)
   (let ((lamba-list (loop for name in names
-                       collect (list name (list 'get-free-frame)))) 
+                       collect (list name (list 'get-free-frame))))
         (free-list (loop for name in names
                       collect (list 'free-frame name))))
     `(let (,@lamba-list)
@@ -222,6 +229,7 @@
 
 (defun-g combine-3-fbo-frag-stage ((v-pos :vec4)
                                    &uniform
+                                   (org :sampler-2d)
                                    (1st :sampler-2d)
                                    (2nd :sampler-2d)
                                    (3th :sampler-2d))
@@ -236,12 +244,43 @@
          (a3 (v:s~ v3 :w)))
     (cond ((= a1 1) v1)
           ((= a2 1) v2)
-          ((= a3 1) v3)
-          (t (v! 1 0 0 0)))))
+          ((= A3 1) v3)
+          (t (v! 0 0 0 0)))))
 
 (defpipeline-g combine-3-fbo ()
   (ghost-vert-stage :vec4)
   (combine-3-fbo-frag-stage :vec4))
+
+
+(defun-g vert-pass-fbo ((v-pos :vec4))
+  (values v-pos
+          v-pos))
+
+(defun-g frag-pass-fbo ((v-pos :vec4)
+                        &uniform
+                        (fbo :sampler-2d))
+  (let ((uv (/ (+ (v:s~ v-pos :xy)
+                  (v! 1 1))
+               2)))
+    (texture fbo uv)))
+
+(defpipeline-g print-fbo ()
+  (vert-pass-fbo :vec4)
+  (frag-pass-fbo :vec4))
+
+(defun-g frag-combine ((v-pos :vec4)
+                       &uniform
+                       (sampler0 :sampler-2d)
+                       (sampler1 :sampler-2d))
+  (let ((uv (/ (+ (v:s~ v-pos :xy)
+                  (v! 1 1))
+               2)))
+    (+ (texture sampler0 uv)
+       (texture sampler1 uv))))
+
+(defpipeline-g combine-2-fbo ()
+  (vert-pass-fbo :vec4)
+  (frag-combine :vec4))
 ;;;;;
 (defun my-tr (x y z)
   "Translation function that puts stuff at the back"
@@ -312,8 +351,13 @@
       (sounds:play-next-song)))
 
 ;;;;;;;;; --------  DRAWNINI
+
+
 (defun draw ()
   (step-host)
+  '(format t "~% ~{~a ~}" (loop for frame in *frames*
+                           collect  (frame-is-free-p frame)
+                             ))
 
 
   (let ((changed (not (equalp (resolution (current-viewport))
@@ -324,112 +368,122 @@
       '(print (format nil "changed~a" (random 1230)))
       (make-frames)))
   (clear)
-
   (when (stepper-can-p)
     (advanced-repl))
+  (with-frames (frame-global)
+    (dolist (player player-functions:*players*)
+      (progn
+        (with-player (player-functions:init-player player)
+          (draw-box 0
+                    0
+                    0
+                    (get-color-v-for-block 'a))
+          (let ((now (now)))
+            (setf (animation-timer *render-state*) (+ (animation-timer *render-state*)
+                                                      (- now (time-before-draw *render-state*)))
+                  (time-before-draw *render-state*) (now)))
+          (with-frames (background-fbo
+                        shadow-fbo
+                        background-and-shadow-fbo
+                        pieces-and-next-pieces-fbo
+                        current-piece-fbo ;; FIXME this and pieces-and-next-pieces-fbo
+                        result-fbo)       ;; can bo one. ye?
+            ;; draws wall to fbo
+            (with-fbo-bound ((frame-fbo background-fbo))
+              (draw-wall tetris:+width+  tetris:+height+
+                         (animation-color *render-state*)
+                         (animation-timer *render-state*)))
 
-  (dolist (player player-functions:*players*)
-    (progn
-      (with-player (player-functions:init-player player)
-        
-        (let ((now (now)))
-          (setf (animation-timer *render-state*) (+ (animation-timer *render-state*)
-                                                    (- now (time-before-draw *render-state*)))
-                (time-before-draw *render-state*) (now)))
-        (with-frames (background-fbo
-                      shadow-fbo
-                      background-and-shadow-fbo
-                      pieces-and-next-pieces-fbo
-                      current-piece-fbo)
-          (with-fbo-bound ((frame-fbo background-fbo))
-            (clear)
-            (draw-wall tetris:+width+  tetris:+height+
-                       (animation-color *render-state*)
-                       (animation-timer *render-state*)))
-          (when (curr-piece tetris:*game-state*)
-            (with-fbo-bound ((frame-fbo shadow-fbo))
-              (clear)
-              (let* ((ghost-piece (tetris:get-current-ghost-piece))
-                     (ghost-shape (piece-shape ghost-piece))
-                     (ghost-col (piece-column ghost-piece))
-                     (ghost-row (piece-row ghost-piece)))
-                ;;::TODO will it break?
-                (loop for row below (length (tetris:get-current-shape))
-                   do (loop for column below (length (car (tetris:get-current-shape)))
-                         for s = (tetris:symbol-at column
-                                                   row
-                                                   ghost-shape)
-                         when (not (eql s '-))
-                         do (draw-box (+ ghost-col column)
-                                      (+ ghost-row row)
-                                      0
-                                      (get-color-v-for-block (tetris:get-current-color))))))))
-          (with-fbo-bound ((frame-fbo background-and-shadow-fbo))
-            (clear)
-            (map-g #'ghost-block-pipeline (get-quad-stream-v2)
-                   :bg-sampler (frame-sampler background-fbo)
-                   :block-sampler (frame-sampler shadow-fbo)))
-          ;;(print (tetris:get-next-pieces :limit 1))
-          ;; draw current shape
+            ;; draws shadow block to fbo
+            (when (curr-piece tetris:*game-state*)
+              (with-fbo-bound ((frame-fbo shadow-fbo))
+                (let* ((ghost-piece (tetris:get-current-ghost-piece))
+                       (ghost-shape (piece-shape ghost-piece))
+                       (ghost-col (piece-column ghost-piece))
+                       (ghost-row (piece-row ghost-piece)))
 
-          (with-fbo-bound ((frame-fbo current-piece-fbo))
-            (clear)
-            (loop for row below (length (tetris:get-current-shape))
-               do (loop for column below (length (car (tetris:get-current-shape)))
-                     for s = (tetris:symbol-at column
-                                               row
-                                               (tetris:get-current-colored-shape))
-                     when (not (eql s '-))
-                     do (draw-box (+ (curr-column tetris:*game-state*) column)
-                                  (+ (curr-row tetris:*game-state*) row)
-                                  0
-                                  (get-color-v-for-block s)))))
+                  (loop for row below (length (tetris:get-current-shape))
+                     do (loop for column below (length (car (tetris:get-current-shape)))
+                           for s = (tetris:symbol-at column
+                                                     row
+                                                     ghost-shape)
+                           when (not (eql s '-))
+                           do (draw-box (+ ghost-col column)
+                                        (+ ghost-row row)
+                                        0
+                                        (get-color-v-for-block (tetris:get-current-color))))))))
+            (with-fbo-bound ((frame-fbo background-and-shadow-fbo))
+              ;; (textures shadow block + copies background) to fbo
+              (map-g #'ghost-block-pipeline (get-quad-stream-v2)
+                     :bg-sampler (frame-sampler background-fbo)
+                     :block-sampler (frame-sampler shadow-fbo)))
 
-          ;; draw 2 next shapes
-          (with-fbo-bound ((frame-fbo pieces-and-next-pieces-fbo))
-            (clear)
-            ;; draw next shapes
-            (let ((offset 1))
-              (loop
-                 for num below 2
-                 for shape in (mapcar
-                               (lambda (piece)
-                                 (tetris:get-colored-shape piece))
-                               (tetris:get-next-pieces :limit 2))
-                 ;; TODO maybe it might now work?
-                 do (progn (loop for row below (length shape)
-                              do (loop for column below (length (car shape))
-                                    for s = (tetris:symbol-at column
-                                                              row
-                                                              shape)
-                                    when (not (eql s '-))
-                                    do (draw-box (+ tetris:+width+ column 1)
-                                                 (+ row 1 offset )
-                                                 0
-                                                 (get-color-v-for-block s))))
-                           (setf offset (+ 1 offset (length shape))))))
-            ;; draw map
-            (loop for row below tetris:+height+
-               do (loop for column below tetris:+width+
-                     for s = (tetris:symbol-at column
-                                               row
-                                               (game-map tetris:*game-state*))
-                     ;; #TODO just create get-current-map etc.
-                     if (eq s '-)
-                     do      '(draw-box column row -1 (get-color-v-for-block s))
-                     else do (progn
-                               '(draw-box column row -2 (get-color-v-for-block '-))
-                               (draw-box column row 0 (get-color-v-for-block s))))))
-          (with-blending (make-blending-params
-                          :destination-rgb :dst-alpha
-                          :destination-alpha :dst-alpha
-                          )
-            (map-g #'combine-3-fbo (get-quad-stream-v2)
-                   :1st (frame-sampler current-piece-fbo)
-                   :2nd (frame-sampler pieces-and-next-pieces-fbo)
-                   :3th (frame-sampler background-and-shadow-fbo)))))
-    ))
+            ;; draws current piece
+            (with-fbo-bound ((frame-fbo current-piece-fbo))
+              (loop for row below (length (tetris:get-current-shape))
+                 do (loop for column below (length (car (tetris:get-current-shape)))
+                       for s = (tetris:symbol-at column
+                                                 row
+                                                 (tetris:get-current-colored-shape))
+                       when (not (eql s '-))
+                       do (draw-box (+ (curr-column tetris:*game-state*) column)
+                                    (+ (curr-row tetris:*game-state*) row)
+                                    0
+                                    (get-color-v-for-block s)))))
 
+            ;; draw 2 next shapes + map to fbo
+            (with-fbo-bound ((frame-fbo pieces-and-next-pieces-fbo))
+              ;; draws 2 next pieces
+              (let ((offset 1))
+                (loop
+                   for num below 2 ; this is limit
+                   for shape in (mapcar
+                                 (lambda (piece)
+                                   (tetris:get-colored-shape piece))
+                                 (tetris:get-next-pieces :limit 2))
+                   ;; TODO maybe it might now work?
+                   do (progn (loop for row below (length shape)
+                                do (loop for column below (length (car shape))
+                                      for s = (tetris:symbol-at column
+                                                                row
+                                                                shape)
+                                      when (not (eql s '-))
+                                      do (draw-box (+ tetris:+width+ column 1)
+                                                   (+ row 1 offset )
+                                                   0
+                                                   (get-color-v-for-block s))))
+                             (setf offset (+ 1 offset (length shape))))))
+              ;; draw map to
+              (loop for row below tetris:+height+
+                 do (loop for column below tetris:+width+
+                       for s = (tetris:symbol-at column
+                                                 row
+                                                 (game-map tetris:*game-state*))
+                       ;; #TODO just create get-current-map etc.
+                       if (eq s '-)
+                       do      '(draw-box column row -1 (get-color-v-for-block s))
+                       else do (progn
+                                 '(draw-box column row -2 (get-color-v-for-block '-))
+                                 (draw-box column row 0 (get-color-v-for-block s))))))
+            (with-fbo-bound ((frame-fbo result-fbo))
+              (map-g #'combine-3-fbo (get-quad-stream-v2)
+                     :1st (frame-sampler current-piece-fbo)
+                     :2nd (frame-sampler pieces-and-next-pieces-fbo)
+                     :3th (frame-sampler background-and-shadow-fbo)))
+
+            ;; combines global buffer with current tetris map,
+            (with-fbo-bound ((frame-fbo result-fbo))
+              (map-g #'combine-2-fbo (get-quad-stream-v2)
+                     :sampler0 (frame-sampler frame-global)
+                     :sampler1 (frame-sampler result-fbo)))
+            ;; then
+            ;; saves everything in global buffer with other maps.
+            (with-fbo-bound ((frame-fbo frame-global))
+              (map-g #'print-fbo (get-quad-stream-v2)
+                     :fbo (frame-sampler result-fbo)))))))
+    ;; draw global buffer
+    (map-g #'print-fbo (get-quad-stream-v2)
+           :fbo (frame-sampler frame-global)))
 
   (when (not *playing-multiplayer*)
     (player-functions:init-player *local-player*)) ;; used only in local
@@ -521,15 +575,14 @@
         (nineveh.mesh.data.primitives:box-gpu-arrays)
       (setf *buf-stream*
             (make-buffer-stream vert :index-array index))))
-  (make-frames)
-  )
+  (make-frames) 
 
 (defun make-frames ()
-    (make-some-frames 5))
+  (make-some-frames 21))
 
-#+ nil (progn
-         (def-simple-main-loop play (:on-start #'init)
-           (draw)))
+(progn
+  (def-simple-main-loop play (:on-start #'init)
+    (draw)))
 
 
 (defun register-callbacks (player)
