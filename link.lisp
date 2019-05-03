@@ -137,7 +137,7 @@
       (remove-client client))))
 
 
-(defun start-server (function)
+(defun start-server (port function)
   (setf *server-running* t)
   (format t "~% - [Server]: STARTING -")
   (bt:make-thread
@@ -145,7 +145,7 @@
      (unwind-protect
           (progn (loop while *server-running*
                     do (progn
-                         (start-simple-server 5519 function))))
+                         (start-simple-server port function))))
        (stop-server))
      (format t "~% - [Server] STOPING - "))
    :name "<SERVER main thread>"))
@@ -163,11 +163,11 @@
 (defparameter *read-loop-lock* (bt:make-lock))
 (defparameter *unreaded-data* nil)
 
-(defun start-client (function)
+(defun start-client (function ip port)
   (if (not *client-running*)
       (progn
         (bt:make-thread (lambda ()
-                          (simple-client 5519 function)))
+                          (simple-client ip port function)))
         (setf *client-running* t))
       (format t "~% - [Client]: ALREADY RUNNING -")))
 
@@ -226,13 +226,13 @@
              (force-output *server-stream*))
     ))
 
-(defun simple-client (port callback)
+(defun simple-client (ip port callback)
   "Connect to a server and send a messange."
   (format t "~% - [Client]: STARTING - ")
   ;; FIXME: do it without with this with-xxx stuff and just close the connection at stop.
   ;; so this sleep can be removed. Then sending data is simpyfied and you can just pass socket stream.
   (unwind-protect
-       (usocket:with-client-socket (socket stream "127.0.0.1" port)
+       (usocket:with-client-socket (socket stream ip port)
          (format t "~% - [Client]: connected - ")
          (setf *server-stream* stream)
          (loop while *client-running*

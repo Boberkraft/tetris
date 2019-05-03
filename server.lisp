@@ -92,12 +92,12 @@
     ("initialize" (initialize-client client))))
 
 
-(defun start ()
-  (link:start-server 'accept-tetris-command))
+(defun start (port)
+  (link:start-server port 'accept-tetris-command))
 
 (defun stop ()
   (link:stop-server))
 
 
-#+ nil (start)
+#+ nil (start 5519)
 #+ nil (stop)

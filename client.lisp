@@ -23,9 +23,11 @@
 (defun start ()
   (link:start-client 'start-message))
 
-(defun start-dummy-client ()
-  (link:start-client (lambda ()
-                       (loop (sleep 0.1)))))
+(defun start-dummy-client (ip port)
+  (link:start-client (loop while link:*client-running*
+                        do (sleep 0.1))
+                     ip port))
+                     5519))
 
 (defun stop ()
   (link:stop-client))
