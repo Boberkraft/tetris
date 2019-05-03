@@ -7,12 +7,12 @@
            :id-local-p
 
            :*players*
-           :*local-player*
+           :*server-players*
            :*callback-for-hooking-up-callbacks*
            :players
            :host-player
            :add-new-player
-           :add-local-player
+          
 
            :find-player
            :with-player
@@ -27,7 +27,7 @@
 ;;render stuff
 
 
-(defparameter *curr-player* nil)
+
 
 (defstruct id
   as-string

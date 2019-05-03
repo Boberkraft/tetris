@@ -536,7 +536,7 @@
 
 
 (defun init ()
-
+  (setf *playing-multiplayer* nil)
   (when (not *playing-multiplayer*)
     (add-and-init-local-player))
 
@@ -575,14 +575,20 @@
         (nineveh.mesh.data.primitives:box-gpu-arrays)
       (setf *buf-stream*
             (make-buffer-stream vert :index-array index))))
-  (make-frames) 
+  (make-frames))
+
+(defun init-multiplayer ()
+  (init)
+  (setf *playing-multiplayer* t))
 
 (defun make-frames ()
   (make-some-frames 21))
 
-(progn
-  (def-simple-main-loop play (:on-start #'init)
-    (draw)))
+#+nil (progn
+        (def-simple-main-loop play (:on-start #'init)
+          (draw))
+        (def-simple-main-loop multi  (:on-start #'init-multiplayer)
+          (draw)))
 
 
 (defun register-callbacks (player)
@@ -608,8 +614,7 @@
       (declare (ignore c))
       (error "You haven't injected controls."))))
 
-(defun prepere-for-multiplayer ()
-  (setf *playing-multiplayer* t))
+
 
 (defmethod player-functions:init-player ((player player))
   ;; there is :before.

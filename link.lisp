@@ -103,7 +103,7 @@
   (usocket:with-socket-listener (socket "127.0.0.1" port)
     (loop while *server-running*
        do (progn
-            (format t "~% - [Server]: waiting for connection -")
+            #+ nil (format t "~% - [Server]: waiting for connection -")
             ;; make a new thread for this connection.
             (when (and (usocket:wait-for-input socket :timeout 1) ;; SETS SOCKET
                        ;; wait for 1 second, returns nil if timeouted.
@@ -111,7 +111,7 @@
               (let ((connection (usocket:socket-accept socket)))
                 (bt:make-thread
                  (lambda ()
-                   (usocket:with-connected-socket
+                   (usocket:with-connected-socket (connection connection)
                        (handle-connection connection callback)))
                  :name (format nil "<SERVER: Thread for handling ~a>" connection) )))))))
 
@@ -217,14 +217,14 @@
   "Calls callback on every new message recived from server."
   ;; blocking
   (let ((data (read-line link:*server-stream*)))
-    (format t "~% - [Client]: recived: ~a" data)
+    '(sleep 1)
+    '(format t "~% - [Client]: recived: ~a" data)
     (funcall callback data)))
 
 (defun send-data-to-server (message)
   (handler-case
       (progn (format *server-stream* message)
-             (force-output *server-stream*))
-    ))
+             (force-output *server-stream*))))
 
 (defun simple-client (ip port callback)
   "Connect to a server and send a messange."
@@ -241,10 +241,10 @@
     (progn (stop-client))))
 
 
-(handler-bind ((error (lambda (c)
-                        (declare (sb-ext:disable-package-locks 'accept))
-                        (print c)
-                        (sb-ext:unlock-package :sb-impl)
-                        (invoke-restart 'sb-impl::accept))))
+;; (handler-bind ((error (lambda (c)
+;;                         (declare (sb-ext:disable-package-locks 'accept))
+;;                         (print c)
+;;                         (sb-ext:unlock-package :sb-impl)
+;;                         (invoke-restart 'sb-impl::accept))))
 
-  (ql:quickload :nineveh))
+;;   (ql:quickload :nineveh))

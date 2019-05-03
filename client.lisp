@@ -27,7 +27,6 @@
   (link:start-client (loop while link:*client-running*
                         do (sleep 0.1))
                      ip port))
-                     5519))
 
 (defun stop ()
   (link:stop-client))
@@ -75,6 +74,7 @@
   (with-input-from-string (message message)
     (let ((from-who (read message)) ; first
           (command (read message)))    ; second
+      (sleep 1)
       (format t "~%  - [Client]: ~s from ~a " command from-who)
       (testing-rendering:with-player (player-functions:init-player from-who) ;; NOTE, with player?
         (process-command command)))))
@@ -95,7 +95,7 @@
                  ("game-map"    (setf (tetris-structures:game-map game-state)  value))
                  ("curr-row"    (setf (tetris-structures:curr-row game-state) value))
                  ("curr-column" (setf (tetris-structures:curr-column game-state) value))
-                 ("curr-piece"  (setf (tetris-structures:curr-piece game-state)
+                 ("curr-piece"  (setf (tetris-structures:curr-piece game-state) 
                                       (let* ((name (fourth command))
                                              ;; rotating by 4 is like rotating by 0
                                              (num-of-rotations (mod (third command) 4))
@@ -108,9 +108,7 @@
                  ("difficulty"  (setf (tetris-structures:difficulty game-state) value))))))))
 
 
-(defun dummy-client ()
-  (loop while link:*client-running*
-     do (sleep 0.1)))
+
 
 (defun super-client ()
   (start-dummy-client)
@@ -125,10 +123,11 @@
           (sleep 0.3)
           (funcall (nth (random (1- (length choices)))
                         choices)))))
-#+nil (start-dummy-client)
+#+nil (start-dummy-client "127.0.0.1"
+                          5519)
 #+nil (link:create-read-loop 'read-loop)
 #+nil (inject-controls)
 #+nil (super-client)
-#+nil '((left) (right) (down) (drop-down) (rotate))
+#+nil '((left) (right) (down) (drop-down) (rotate) (initialize))
 #+nil (start-message)
 #+nil (stop)
