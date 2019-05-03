@@ -4,11 +4,8 @@
   :license  "you can use, just don't make money of it"
   :version "0.0.1"
   :serial t
-  :depends-on (
-               #:bt-semaphore
+  :depends-on (#:bt-semaphore
                #:rtg-math
                #:utils)
-  :components (
-               (:file "tetris-structures")
-               ))
+  :components ((:file "tetris-structures")))
 

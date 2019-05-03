@@ -95,7 +95,7 @@
               or (on-key-up skittle.glop.keys:r #'rotate).
   The first version offers ability to redefine funcion.
   If more-data-p is true then callback are going to get 4 arguments."
-  (format t "Registering new key UP ~a with ~a~%" key callback)
+  (format t "~%Registering new key UP ~a with ~a" key callback)
   (add-event-listener-to-system key
                                 callback
                                 (lambda (pressed &rest rest)
@@ -106,7 +106,7 @@
 
 (defun on-key-down (key callback &optional more-data-p)
   "Calls callback when key is first time pressed. Resets on unpressing"
-  (format t "Registering new key DOWN ~a with ~a~%" key callback)
+  (format t "~%Registering new key DOWN ~a with ~a" key callback)
   (add-event-listener-to-system key
                                 callback
                                 (let ((last-time nil)) ;; stores last value of pressed
@@ -120,7 +120,7 @@
 
 (defun on-key (key callback &optional more-data-p)
   "Calls callback when key is being holded. Resets on unpressing"
-  (format t "Registering new key ~a with ~a~%" key callback)
+  (format t "~%Registering new key ~a with ~a" key callback)
   (add-event-listener-to-system key
                                 callback
                                 ;; stores last value of pressed

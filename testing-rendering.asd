@@ -10,7 +10,7 @@
   :depends-on (#:cepl.sdl2
                #:cepl
                #:nineveh
-               #:livesupport
+
                #:cepl.skitter.sdl2
                #:skitter.glop
                #:harmony-simple
@@ -18,12 +18,8 @@
                #:bt-semaphore
                #:tetris-structures
                #:tetris
-               #:utils
-               )
-  :components (
-               (:file "sounds")
-               
+               #:utils)
+  :components ((:file "sounds")
                (:file "player-functions")
-               (:file "testing-rendering")
-               ))
+               (:file "testing-rendering")))
 

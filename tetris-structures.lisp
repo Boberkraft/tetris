@@ -124,7 +124,7 @@
   id
   number
   render-state
-  game-state)
+  game-state) 
 
 
 (defclass render-state ()

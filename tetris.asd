@@ -6,6 +6,4 @@
   :serial t
   :depends-on (#:tetris-structures
                #:bt-semaphore)
-  :components (
-               (:file "tetris")))
-
+  :components ((:file "tetris")))
