@@ -61,11 +61,23 @@
        while pos)))
 |#
 
+(defun register-callbacks (to-whom-player)
+  (setf (tetris-structures:add-new-next-piece tetris:*callbacks*)
+        (lambda ()
+          (inform-others-about-new-piece to-whom-player))))
+
+(defun inform-others-about-new-piece (client)
+  (format t "~% Telling everybody what piece to choose for ~a" (client-id client))
+  (let ((piece (tetris:get-random-piece-number)))
+    (tetris:add-piece-to-queue piece)
+    (inform-other-players client (list "next-piece" piece))))
+
 (defun initialize-client (who-to-initialize)
-  "Sends state of all of the players to who-to-initalize. He is given messages as such:
+  "Registers callbacks for user. Sends state of all of the players to who-to-initalize. He is given messages as such:
    id (\"set\" \"game-moge\" ((- - - -) (- - - -))) etc.
    id (\"set\" \"curr-row\" 0)
    id (\"set\" \"curr-piece\" 2 't)"
+  (register-callbacks who-to-initialize)
   (let ((data nil))
     (dolist (player player-functions:*server-players*)
       (let* ((id (tetris-structures:player-id player))

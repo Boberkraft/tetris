@@ -528,7 +528,7 @@
          ))
 
 (defun set-background-animation-timer (color)
-  (format t "~%Setting new animation: ~a"color)
+  (format t "~%Setting new animation: ~a" color)
   (format t "~%Playing sound~%")
   (sounds:play-hit-sound)
   (setf (animation-timer *render-state*) 0f0
@@ -536,9 +536,7 @@
 
 
 (defun init ()
-  (setf *playing-multiplayer* nil)
-  (when (not *playing-multiplayer*)
-    (add-and-init-local-player))
+
 
   (sounds:init-sound-system)
   #+nil (sounds:play-background-music)
@@ -578,22 +576,29 @@
   (make-frames))
 
 (defun init-multiplayer ()
-  (init)
-  (setf *playing-multiplayer* t))
+  (setf *playing-multiplayer* t)
+  (init))
+
+(defun init-singleplayer ()
+  (setf *playing-multiplayer* nil)
+  (init))
 
 (defun make-frames ()
   (make-some-frames 21))
 
+
+;;; ------------------------------- UNUSABLE OUTSIDE EMACS -----------------------------
 #+nil (progn
-        (def-simple-main-loop play (:on-start #'init)
+        (def-simple-main-loop play (:on-start #'init-singleplayer)
           (draw))
         (def-simple-main-loop multi  (:on-start #'init-multiplayer)
           (draw)))
-
+;;; -------------------------------------------------------------------------------------
 
 (defun register-callbacks (player)
   (setf (multiplayer-p (player-game-state player)) *playing-multiplayer*)
   (setf (piece-touched (callbacks (player-game-state player))) 'set-background-animation-timer))
+
 
 (defun main-start ()
   (cepl:repl)

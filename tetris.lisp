@@ -38,6 +38,8 @@
            :get-ghost-piece
            :get-current-ghost-piece
            :get-current-color
+           :get-random-piece
+           :get-random-piece-number
            :get-colored-shape
            :rotate
            :create-computer
@@ -133,7 +135,10 @@
 
 (defun get-next-pieces (&key (limit nil))
   (if limit
-      (subseq (next-pieces *game-state*) 0 limit)
+      (if (> (length (next-pieces *game-state*))
+             limit)
+          (subseq (next-pieces *game-state*) 0 limit)
+          (next-pieces *game-state*))
       (next-pieces *game-state*)))
 
 (defmethod get-piece ((s symbol))
@@ -318,9 +323,10 @@
         (curr-row *game-state*) 0)
   ;; remove from queue
   (setf (next-pieces *game-state*) (rest (next-pieces  *game-state*)))
-  (when (not (multiplayer-p *game-state*))
+  (if (not (multiplayer-p *game-state*))
     ;; server will add a piece inside  different method.
-    (add-piece-to-queue (get-random-piece-number))))
+      (add-piece-to-queue (get-random-piece-number))
+      (funcall (add-new-next-piece *callbacks*))))
 
 (defun add-piece-to-queue (piece-name)
   (format t "~%Added a random piece. MULTIPLAYER IS ~s." (multiplayer-p *game-state*))
@@ -523,7 +529,8 @@
 
 (defun restart-tetris ()
   (setf (game-map *game-state*) (create-map))  ;; TODO: it shound be in lisp-structures
-  (populate-next-pieces))
+  (when (not (multiplayer-p *game-state*))
+    (populate-next-pieces)))
 ;;;---------------------  META STUFF
 
 (defun create-game-state ()

@@ -21,13 +21,14 @@
             :events
             :difficulty
             :multiplayer-p
+            :server-p
             :next-pieces
             :callbacks
             :misc
 
             ;; callbacks
             :piece-touched
-            :generate-new-piece
+            :add-new-next-piece
 
             ;; misc
             :lock
@@ -88,8 +89,8 @@
    (game-over
     :accessor game-over
     :initform nil)
-   (is-this-multiplayer
-    :accessor multiplayer-p
+   (is-this-server
+    :accessor server-p
     :initform nil)
    (events
     :accessor events
