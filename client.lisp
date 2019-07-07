@@ -20,13 +20,7 @@
 
 (in-package :client)
 
-(defun start ()
-  (link:start-client 'start-message))
 
-(defun start-dummy-client (ip port)
-  (link:start-client (loop while link:*client-running*
-                        do (sleep 0.1))
-                     ip port))
 
 (defun stop ()
   (link:stop-client))
@@ -61,7 +55,7 @@
 (defun initialize ()
   (send "initialize~%"))
 
-(defun start-message ()
+(defun simple-messages ()
   (send "left~%")
   (send "left~%")
   (send "left~%")
@@ -74,14 +68,13 @@
   (with-input-from-string (message message)
     (let ((from-who (read message)) ; first
           (command (read message)))    ; second
-      (sleep 1)
       (format t "~%  - [Client]: ~s from ~a " command from-who)
       (testing-rendering:with-player (player-functions:init-player from-who) ;; NOTE, with player?
         (process-command command)))))
 
 
 (defmethod process-command ((command list))
-  "Every global variable is replaced.  "
+  "Every global variable is replaced. Look at format spec at the server sending function. "
   (let ((game-state tetris:*game-state*))
     (alexandria:switch ((first command) :test #'equalp)
       ("left" (tetris:left))
@@ -95,7 +88,7 @@
                  ("game-map"    (setf (tetris-structures:game-map game-state)  value))
                  ("curr-row"    (setf (tetris-structures:curr-row game-state) value))
                  ("curr-column" (setf (tetris-structures:curr-column game-state) value))
-                 ("curr-piece"  (setf (tetris-structures:curr-piece game-state) 
+                 ("curr-piece"  (setf (tetris-structures:curr-piece game-state)
                                       (let* ((name (fourth command))
                                              ;; rotating by 4 is like rotating by 0
                                              (num-of-rotations (mod (third command) 4))
@@ -105,27 +98,35 @@
                                           (setf piece (tetris:rotated-piece piece)))
                                         ;; set it
                                         (setf (tetris-structures:curr-piece game-state) piece))))
-                 ("difficulty"  (setf (tetris-structures:difficulty game-state) value))))))))
-
-
+                 ("difficulty"  (setf (tetris-structures:difficulty game-state) value))
+                 ("next-pieces" (setf (tetris-structures:next-pieces game-state) (mapcar (lambda (piece-name)
+                                                                                           (tetris:get-piece piece-name))
+                                                                                         value)))
+                 ("next-piece" (tetris:add-piece-to-queue value))))))))
 
 
 (defun super-client ()
-  (start-dummy-client)
+  (dotimes (i 30)
+    (let ((choices '(client:left client:left client:left client:left client:left client:left
+                     client:right client:right client:right client:right client:right client:right
+                     client:rotate
+                           client:rotate
+                           client:down client:down client:down client:down client:down client:down client:down client:down
+                           client:down client:down client:down client:down client:down client:down client:down client:down
+                           client:drop-down)))
+            (sleep 0.15)
+            (funcall (nth (random (1- (length choices)))
+                          choices)))))
+
+(defun im-a-new-connection-wanting-to-play ()
+  (link:start-client "127.0.0.1"
+                     5519)
   (link:create-read-loop 'read-loop)
-  (loop (let ((choices '(client:left client:left client:left client:left client:left client:left
-                         client:right client:right client:right client:right client:right client:right
-                         client:rotate
-                         client:rotate
-                         client:down client:down client:down client:down client:down client:down client:down client:down
-                         client:down client:down client:down client:down client:down client:down client:down client:down
-                         client:drop-down)))
-          (sleep 0.3)
-          (funcall (nth (random (1- (length choices)))
-                        choices)))))
-#+nil (start-dummy-client "127.0.0.1"
-                          5519)
-#+nil (link:create-read-loop 'read-loop)
+  (initialize)
+  (super-client))
+
+#+nil (im-a-new-connection-wanting-to-play)
+
 #+nil (inject-controls)
 #+nil (super-client)
 #+nil '((left) (right) (down) (drop-down) (rotate) (initialize))

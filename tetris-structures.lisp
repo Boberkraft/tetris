@@ -20,12 +20,14 @@
             :game-over
             :events
             :difficulty
+            :multiplayer-p
             :next-pieces
             :callbacks
             :misc
 
             ;; callbacks
             :piece-touched
+            :generate-new-piece
 
             ;; misc
             :lock
@@ -86,6 +88,9 @@
    (game-over
     :accessor game-over
     :initform nil)
+   (is-this-multiplayer
+    :accessor multiplayer-p
+    :initform nil)
    (events
     :accessor events
     :initform nil)
@@ -110,7 +115,12 @@
     :accessor piece-touched
     :initform (lambda (piece-color)
                 (declare (ignore piece-color))
-                (format t "~% callback not registered!")))))
+                (format t "~% piece-touched callback not registered!")))
+   (add-new-next-piece
+    :accessor add-new-next-piece
+    :initform (lambda ()
+                (format t "~% add-new-next-piece not registered!")))))
+
 (defclass misc ()
   ((lock
     :accessor lock
@@ -125,7 +135,6 @@
   number
   render-state
   game-state) 
-
 
 (defclass render-state ()
   ((animation-timer

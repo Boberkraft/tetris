@@ -592,6 +592,7 @@
 
 
 (defun register-callbacks (player)
+  (setf (multiplayer-p (player-game-state player)) *playing-multiplayer*)
   (setf (piece-touched (callbacks (player-game-state player))) 'set-background-animation-timer))
 
 (defun main-start ()

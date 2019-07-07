@@ -74,6 +74,7 @@
              (curr-row (tetris-structures:curr-row game-state))
              (curr-column (tetris-structures:curr-column game-state))
              (curr-piece (tetris-structures:curr-piece game-state))
+             (next-pieces (tetris-structures:next-pieces game-state))
              (rotation (if curr-piece
                            (tetris-structures:piece-rotation curr-piece)
                            0))
@@ -88,7 +89,10 @@
                            (message-with-adressee id (list "set" "curr-row" curr-row))
                            (message-with-adressee id (list "set" "curr-column" curr-column))
                            (message-with-adressee id (list "set" "curr-piece" rotation shape-name))
-                           (message-with-adressee id (list "set" "difficulty" difficulty)))
+                           (message-with-adressee id (list "set" "difficulty" difficulty))
+                           (message-with-adressee id (list "set" "next-pieces" (mapcar (lambda (piece)
+                                                                                         (tetris-structures:piece-name piece))
+                                                                                       next-pieces))))
               data)))
     '(format t  "~{~a~}" data)
     (inform-player who-to-initialize (format nil "~{~a~}" data))))
@@ -117,7 +121,7 @@
 (defun inform-player (to-who message)
   "Sends UNFORMATED message to a client."
   (link:send-data-to-client to-who
-                            message))
+                              message))
 
 (defun process-command-sended-to-server (client command)
   "Calls resposible tetris function"

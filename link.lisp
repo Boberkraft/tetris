@@ -163,11 +163,13 @@
 (defparameter *read-loop-lock* (bt:make-lock))
 (defparameter *unreaded-data* nil)
 
-(defun start-client (function ip port)
+(defun start-client ( ip port)
+  "Starts server that establishes connections"
   (if (not *client-running*)
       (progn
         (bt:make-thread (lambda ()
-                          (simple-client ip port function)))
+                          (simple-client ip port (lambda () (loop while link:*client-running*
+                                                       do (sleep 0.1))))))
         (setf *client-running* t))
       (format t "~% - [Client]: ALREADY RUNNING -")))
 
@@ -183,24 +185,20 @@
        *server-stream*))
 
 ;;; ---------- Imperetive style. Unused and UNSTESTED
-(defun create-read-loop ()
-  (bt:make-thread (lambda ()
-                    (loop while *client-running*
-                       do (funcall 'read-loop)))
-                  :name "<CLIENT functional read-loop>"))
 
-(defun read-loop ()
-  (when (connected-p)
-    (let ((data (read link:*server-stream*)))
-      (bt:with-lock-held (*read-loop-lock*)
-        (push data *unreaded-data*)))))
 
-(defun is-there-data-to-read ()
-  (null *unreaded-data*))
+#+ nil (defun read-loop ()
+         (when (connected-p)
+           (let ((data (read link:*server-stream*)))
+             (bt:with-lock-held (*read-loop-lock*)
+                                (push data *unreaded-data*)))))
 
-(defun get-data ()
-  (bt:with-lock-held (*read-loop-lock*)
-    (pop *unreaded-data*)))
+#+ nil (defun is-there-data-to-read ()
+         (null *unreaded-data*))
+
+#+ nil (defun get-data ()
+         (bt:with-lock-held (*read-loop-lock*)
+                            (pop *unreaded-data*)))
 
 ;;; ----------------
 ;; Functional style.
@@ -209,22 +207,15 @@
   (bt:make-thread (lambda ()
                     (loop while *client-running*
                        do (when *server-stream* ; call only if the connection is established.
-                            (on-message-loop callback))))
+                            (funcall callback (read-line link:*server-stream*))))
+                    (format t "~% - [Client]: Read loop exit - "))
                   :name "<CLIENT functional read-loop>"))
 
 
-(defun on-message-loop (callback)
-  "Calls callback on every new message recived from server."
-  ;; blocking
-  (let ((data (read-line link:*server-stream*)))
-    '(sleep 1)
-    '(format t "~% - [Client]: recived: ~a" data)
-    (funcall callback data)))
 
 (defun send-data-to-server (message)
-  (handler-case
-      (progn (format *server-stream* message)
-             (force-output *server-stream*))))
+  (progn (format *server-stream* message)
+         (force-output *server-stream*)))
 
 (defun simple-client (ip port callback)
   "Connect to a server and send a messange."

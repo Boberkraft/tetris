@@ -28,6 +28,7 @@
            :down
            :init-tetris
            :reinit-tetris
+           :add-piece-to-queue
            :create-game-state-and-reinit
            :drop-down
            :get-piece
@@ -308,22 +309,24 @@
                                (game-map *game-state*))
                     '-))))
 
-(defun add-new-next-piece (piece)
-  "Puts new piece at the end of queue, removes first piece"
-  (setf (next-pieces *game-state*) (append (rest (next-pieces  *game-state*))
-                                           (list piece))))
-
-(defun generate-new-piece ()
-  (format t "~%Setting new piece.")
+(defun remove-old-piece ()
+  (format t "~%Removing old from queue and reseting variables.")
   ;; sets piece
   (setf (curr-piece *game-state*) (first (next-pieces *game-state*)))
   ;; center
   (setf (curr-column *game-state*) (floor (/ +width+ 2))
         (curr-row *game-state*) 0)
-  ;; removes piece and generates new
-  (let* ((new-piece (get-random-piece)))
-    (format t "~%Generating new piece.")
-    (add-new-next-piece new-piece)))
+  ;; remove from queue
+  (setf (next-pieces *game-state*) (rest (next-pieces  *game-state*)))
+  (when (not (multiplayer-p *game-state*))
+    ;; server will add a piece inside  different method.
+    (add-piece-to-queue (get-random-piece-number))))
+
+(defun add-piece-to-queue (piece-name)
+  (format t "~%Added a random piece. MULTIPLAYER IS ~s." (multiplayer-p *game-state*))
+  (push (get-piece piece-name)
+        (next-pieces *game-state*)))
+
 
 (defun remove-current-piece-from-map ()
   (remove-shape-from-map (get-current-colored-shape)
@@ -446,7 +449,7 @@
   (bt:with-lock-held ((lock *misc*))
     (execute-all-events)
     (when (null (curr-piece *game-state*))
-      (generate-new-piece)
+      (remove-old-piece)
       (when (will-shape-touch-others (piece-shape (curr-piece *game-state*))
                                      (curr-column *game-state*)
                                      (curr-row *game-state*))
