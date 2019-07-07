@@ -581,6 +581,8 @@
 
 (defun init-singleplayer ()
   (setf *playing-multiplayer* nil)
+  (setf (tetris-structures:multiplayer-p (tetris-structures:player-game-state *local-player*))
+        nil)
   (init))
 
 (defun make-frames ()
@@ -596,7 +598,9 @@
 ;;; -------------------------------------------------------------------------------------
 
 (defun register-callbacks (player)
-  (setf (multiplayer-p (player-game-state player)) *playing-multiplayer*)
+  (when *local-player*
+    (setf (tetris-structures:multiplayer-p (tetris-structures:player-game-state *local-player*))
+          *playing-multiplayer*))
   (setf (piece-touched (callbacks (player-game-state player))) 'set-background-animation-timer))
 
 

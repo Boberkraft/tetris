@@ -21,7 +21,6 @@
             :events
             :difficulty
             :multiplayer-p
-            :server-p
             :next-pieces
             :callbacks
             :misc
@@ -89,9 +88,9 @@
    (game-over
     :accessor game-over
     :initform nil)
-   (is-this-server
-    :accessor server-p
-    :initform nil)
+   (multiplayer-p
+    :accessor multiplayer-p
+    :initform t)
    (events
     :accessor events
     :initform nil)

@@ -9,10 +9,8 @@
            :*players*
            :*server-players*
            :*callback-for-hooking-up-callbacks*
-           :players
            :host-player
            :add-new-player
-          
 
            :find-player
            :with-player

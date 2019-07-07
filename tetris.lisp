@@ -580,3 +580,12 @@
 ;;                                          a)))
 ;;                     list-a new-one))
 ;;           '((- x -)(x x x)(x x x)))
+
+
+#+ nil (progn
+         (declaim (optimize (debug 3)))
+         (push #p"C:/Users/Bobi/Desktop/lispu/projekty/tetris/" asdf:*central-registry*)
+         (ql:quickload :testing-rendering)
+         (ql:quickload :server)
+         (in-package :testing-rendering)
+         )

@@ -67,7 +67,7 @@
           (inform-others-about-new-piece to-whom-player))))
 
 (defun inform-others-about-new-piece (client)
-  (format t "~% Telling everybody what piece to choose for ~a" (client-id client))
+  (format t "~% Telling everybody what piece to choose for ~a" (link:client-id client))
   (let ((piece (tetris:get-random-piece-number)))
     (tetris:add-piece-to-queue piece)
     (inform-other-players client (list "next-piece" piece))))
@@ -153,5 +153,5 @@
   (link:stop-server))
 
 
-#+ nil (start 5519)
+#+ nil (start 5520)
 #+ nil (stop)

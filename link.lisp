@@ -112,8 +112,8 @@
                 (bt:make-thread
                  (lambda ()
                    (usocket:with-connected-socket (connection connection)
-                       (handle-connection connection callback)))
-                 :name (format nil "<SERVER: Thread for handling ~a>" connection) )))))))
+                     (handle-connection connection callback)))
+                 :name (format nil "<SERVER: Thread for handling ~a>" connection))))))))
 
 (defun handle-connection (connection callback)
   "Handles the communication."
@@ -138,17 +138,18 @@
 
 
 (defun start-server (port function)
-  (setf *server-running* t)
-  (format t "~% - [Server]: STARTING -")
-  (bt:make-thread
-   (lambda ()
-     (unwind-protect
-          (progn (loop while *server-running*
-                    do (progn
-                         (start-simple-server port function))))
-       (stop-server))
-     (format t "~% - [Server] STOPING - "))
-   :name "<SERVER main thread>"))
+  (when (not (server-running-p))
+    (setf *server-running* t)
+    (format t "~% - [Server]: STARTING -")
+    (bt:make-thread
+     (lambda ()
+       (unwind-protect
+            (progn (loop while *server-running*
+                      do (progn
+                           (start-simple-server port function))))
+         (stop-server))
+       (format t "~% - [Server] STOPING - "))
+     :name "<SERVER main thread>")))
 
 (defun stop-server ()
   "Resets all server variables"

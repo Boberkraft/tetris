@@ -120,7 +120,7 @@
 
 (defun im-a-new-connection-wanting-to-play ()
   (link:start-client "127.0.0.1"
-                     5519)
+                     5520)
   (link:create-read-loop 'read-loop)
   (initialize)
   (super-client))
