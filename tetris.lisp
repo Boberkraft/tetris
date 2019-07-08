@@ -34,6 +34,7 @@
            :get-piece
            :rotated-piece
            :create-game-state
+           :populate-next-pieces
            :get-current-colored-shape
            :get-ghost-piece
            :get-current-ghost-piece
@@ -315,7 +316,7 @@
                     '-))))
 
 (defun remove-old-piece ()
-  (format t "~%Removing old from queue and reseting variables.")
+  "Removes first piece from queue and reseting variables variables to point at the middle"
   ;; sets piece
   (setf (curr-piece *game-state*) (first (next-pieces *game-state*)))
   ;; center

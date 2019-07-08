@@ -145,6 +145,10 @@
     ("drop-down" (tetris:drop-down))
     ("initialize" (initialize-client client))))
 
+(defmethod player-functions:add-new-player :after ((id player-functions:id))
+  (tetris:with-player (player-functions:init-player id)
+    (tetris:populate-next-pieces)
+    (format t "~% - [Server]: New player created . Populating him. Lets hope that he initializes!-")))
 
 (defun start (port)
   (link:start-server port 'accept-tetris-command))

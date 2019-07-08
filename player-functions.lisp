@@ -51,7 +51,7 @@
   (let ((player (find-player id)))
     (init-player (if player
                      player
-                     (add-new-player id))))
+                     (player-functions:add-new-player id))))
   )
 
 (defmethod init-player ((number number))
@@ -73,8 +73,9 @@
                *players*
                *server-players*)))
 
+(defgeneric player-functions (id))
 
-(defun add-new-player (id)
+(defmethod add-new-player ((id id))
   "Adds new player to the game and returns him"
   (let ((player (make-player :id id
                              :game-state (tetris:create-game-state)
