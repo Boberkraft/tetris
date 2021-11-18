@@ -1,13 +1,9 @@
-# testing-rendering
-### _Hello_
+# Tetris
 
-This is a project to test common lisp.
-
-Maybe im going to add multiplayer later.
+This is a project to test common lisp with OpenGL 
 
 
 ## How to start?
-
 
 Turn on Common lisp:
 
